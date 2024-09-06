@@ -4,17 +4,15 @@ const path = require("path");
 const colors = require("colors");
 const readline = require("readline");
 const { DateTime } = require("luxon");
-<<<<<<< HEAD
 const { Mutex } = require("async-mutex");
-const consoleMutex = new Mutex();
-=======
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
 const {
   Worker,
   isMainThread,
   parentPort,
   workerData,
 } = require("worker_threads");
+
+const consoleMutex = new Mutex();
 
 class GameBot {
   constructor(threadNumber) {
@@ -23,10 +21,7 @@ class GameBot {
     this.token = null;
     this.userInfo = null;
     this.currentGameId = null;
-<<<<<<< HEAD
-    this.username = null; // Added to store username
-=======
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
+    this.username = null;
     this.userAgents = [
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
       "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Safari/605.1.15",
@@ -45,8 +40,7 @@ class GameBot {
     return new Promise((resolve) => setTimeout(resolve, delay));
   }
 
-<<<<<<< HEAD
-  async log(msg, type = "INFO", additionalInfo = " ") {
+  async log(msg, type = "INFO", additionalInfo = "") {
     const timestamp = new Date().toLocaleTimeString();
     let statusMsg;
     switch (type) {
@@ -64,7 +58,7 @@ class GameBot {
     }
 
     // Pad the statusMsg to ensure consistent width and spacing
-    statusMsg = ` ${statusMsg.padEnd(9)} `; // Add space before and after, ensure total width of 9
+    statusMsg = ` ${statusMsg.padEnd(7)} `; // Add space before and after, ensure total width of 9
 
     const logMessage = `${timestamp} |${statusMsg}| | ${this.threadNumber
       .toString()
@@ -75,50 +69,6 @@ class GameBot {
     });
 
     await this.randomDelay();
-  }
-
-  async Countdown(seconds) {
-    for (let i = Math.floor(seconds); i >= 0; i--) {
-      await consoleMutex.runExclusive(() => {
-        readline.cursorTo(process.stdout, 0);
-        process.stdout.write(
-          `${new Date().toLocaleTimeString()} | ${this.threadNumber
-            .toString()
-            .padStart(3, " ")} | |${
-            this.username
-          }| Waiting ${i} seconds to continue...`
-        );
-      });
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-    }
-    await consoleMutex.runExclusive(() => {
-      readline.cursorTo(process.stdout, 0);
-      readline.clearLine(process.stdout, 0);
-    });
-=======
-  async log(msg, type = "info") {
-    const timestamp = new Date().toLocaleTimeString();
-    let coloredMsg;
-    switch (type) {
-      case "success":
-        coloredMsg = msg.green;
-        break;
-      case "error":
-        coloredMsg = msg.red;
-        break;
-      case "warning":
-        coloredMsg = msg.yellow;
-        break;
-      default:
-        coloredMsg = msg.blue;
-    }
-    console.log(
-      `${timestamp} | ${this.threadNumber
-        .toString()
-        .padStart(3, " ")} | ${coloredMsg}`
-    );
-    await this.randomDelay();
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
   }
 
   async headers(token = null) {
@@ -148,7 +98,6 @@ class GameBot {
           headers: await this.headers(),
         });
         if (response.status === 200) {
-<<<<<<< HEAD
           await this.log("Login successful", "SUCCESS");
           this.token = response.data.token.refresh;
           return this.token;
@@ -157,36 +106,17 @@ class GameBot {
           await this.log(
             `Failed to get token, retrying attempt ${attempt}`,
             "FAILED"
-=======
-          await this.log("Login successful", "success");
-          this.token = response.data.token.refresh;
-          return this.token;
-        } else {
-          await this.log(JSON.stringify(response.data), "warning");
-          await this.log(
-            `Failed to get token, retrying attempt ${attempt}`,
-            "warning"
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
           );
         }
       } catch (error) {
         await this.log(
           `Failed to get token, retrying attempt ${attempt}: ${error.message}`,
-<<<<<<< HEAD
           "FAILED"
         );
         await this.log(error.toString(), "FAILED");
       }
     }
     await this.log("Failed to get token after 3 attempts.", "FAILED");
-=======
-          "error"
-        );
-        await this.log(error.toString(), "error");
-      }
-    }
-    await this.log("Failed to get token after 3 attempts.", "error");
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
     return null;
   }
 
@@ -199,12 +129,11 @@ class GameBot {
       );
       if (response.status === 200) {
         this.userInfo = response.data;
-        this.username = this.userInfo.username; // Set username
+        this.username = this.userInfo.username;
         return this.userInfo;
       } else {
         const result = response.data;
         if (result.message === "Token is invalid") {
-<<<<<<< HEAD
           await this.log("Invalid token, getting new token...", "FAILED");
           const newToken = await this.getNewToken();
           if (newToken) {
@@ -216,28 +145,11 @@ class GameBot {
           }
         } else {
           await this.log("Unable to get user info", "FAILED");
-=======
-          await this.log("Invalid token, getting new token...", "warning");
-          const newToken = await this.getNewToken();
-          if (newToken) {
-            await this.log("Got new token, retrying...", "info");
-            return this.getUserInfo();
-          } else {
-            await this.log("Failed to get new token.", "error");
-            return null;
-          }
-        } else {
-          await this.log("Unable to get user info", "error");
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
           return null;
         }
       }
     } catch (error) {
-<<<<<<< HEAD
       await this.log(`Unable to get user info: ${error.message}`, "FAILED");
-=======
-      await this.log(`Unable to get user info: ${error.message}`, "error");
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
       return null;
     }
   }
@@ -251,11 +163,7 @@ class GameBot {
       );
       return response.data;
     } catch (error) {
-<<<<<<< HEAD
       await this.log(`Unable to get balance info: ${error.message}`, "FAILED");
-=======
-      await this.log(`Unable to get balance info: ${error.message}`, "error");
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
       return null;
     }
   }
@@ -273,30 +181,18 @@ class GameBot {
         this.currentGameId = response.data.gameId;
         return response.data;
       } else {
-<<<<<<< HEAD
         await this.log("Unable to play game", "FAILED");
         return null;
       }
     } catch (error) {
       await this.log(`Unable to play game: ${error.message}`, "FAILED");
-=======
-        await this.log("Unable to play game", "error");
-        return null;
-      }
-    } catch (error) {
-      await this.log(`Unable to play game: ${error.message}`, "error");
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
       return null;
     }
   }
 
   async claimGame(points) {
     if (!this.currentGameId) {
-<<<<<<< HEAD
       await this.log("No current gameId to claim.", "FAILED");
-=======
-      await this.log("No current gameId to claim.", "warning");
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
       return null;
     }
 
@@ -310,13 +206,8 @@ class GameBot {
       );
       return response.data;
     } catch (error) {
-<<<<<<< HEAD
       await this.log(`Unable to claim game reward: ${error.message}`, "FAILED");
       await this.log(error.toString(), "FAILED");
-=======
-      await this.log(`Unable to claim game reward: ${error.message}`, "error");
-      await this.log(error.toString(), "error");
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
       return null;
     }
   }
@@ -331,11 +222,7 @@ class GameBot {
       );
       return response.data;
     } catch (error) {
-<<<<<<< HEAD
       await this.log(`Unable to claim balance: ${error.message}`, "FAILED");
-=======
-      await this.log(`Unable to claim balance: ${error.message}`, "error");
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
       return null;
     }
   }
@@ -351,11 +238,7 @@ class GameBot {
       );
       return response.data;
     } catch (error) {
-<<<<<<< HEAD
       await this.log(`Unable to start farming: ${error.message}`, "FAILED");
-=======
-      await this.log(`Unable to start farming: ${error.message}`, "error");
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
       return null;
     }
   }
@@ -371,11 +254,7 @@ class GameBot {
     } catch (error) {
       await this.log(
         `Unable to check friend balance: ${error.message}`,
-<<<<<<< HEAD
         "FAILED"
-=======
-        "error"
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
       );
       return null;
     }
@@ -391,11 +270,7 @@ class GameBot {
       );
       return response.data;
     } catch (error) {
-<<<<<<< HEAD
       await this.log(`Unable to claim friend balance`, "FAILED");
-=======
-      await this.log(`Unable to claim friend balance`, "error");
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
       return null;
     }
   }
@@ -412,11 +287,7 @@ class GameBot {
     } catch (error) {
       await this.log(
         `You have already checked in or unable to check in daily`,
-<<<<<<< HEAD
         "SUCCESS"
-=======
-        "error"
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
       );
       return null;
     }
@@ -424,21 +295,22 @@ class GameBot {
 
   async Countdown(seconds) {
     for (let i = Math.floor(seconds); i >= 0; i--) {
-      readline.cursorTo(process.stdout, 0);
-      process.stdout.write(
-        `${new Date().toLocaleTimeString()} | ${this.threadNumber
-          .toString()
-<<<<<<< HEAD
-          .padStart(3, " ")} | |${
-          this.username
-        }| Waiting ${i} seconds to continue...`
-=======
-          .padStart(3, " ")} | Waiting ${i} seconds to continue...`
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
-      );
+      await consoleMutex.runExclusive(() => {
+        readline.cursorTo(process.stdout, 0);
+        process.stdout.write(
+          `${new Date().toLocaleTimeString()} | ${this.threadNumber
+            .toString()
+            .padStart(3, " ")} | |${
+            this.username
+          }| Waiting ${i} seconds to continue...`
+        );
+      });
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
-    console.log("");
+    await consoleMutex.runExclusive(() => {
+      readline.cursorTo(process.stdout, 0);
+      readline.clearLine(process.stdout, 0);
+    });
   }
 
   async getTasks() {
@@ -451,19 +323,11 @@ class GameBot {
       if (response.status === 200) {
         return response.data;
       } else {
-<<<<<<< HEAD
         await this.log("Unable to get task list", "FAILED");
         return [];
       }
     } catch (error) {
       await this.log(`Unable to get task list: ${error.message}`, "FAILED");
-=======
-        await this.log("Unable to get task list", "error");
-        return [];
-      }
-    } catch (error) {
-      await this.log(`Unable to get task list: ${error.message}`, "error");
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
       return [];
     }
   }
@@ -506,11 +370,7 @@ class GameBot {
         { headers: await this.headers(this.token) }
       );
       if (response.status === 200) {
-<<<<<<< HEAD
         await this.log("You have successfully joined the tribe", "SUCCESS");
-=======
-        await this.log("You have successfully joined the tribe", "success");
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
         return true;
       }
     } catch (error) {
@@ -519,46 +379,31 @@ class GameBot {
         error.response.data &&
         error.response.data.message === "USER_ALREADY_IN_TRIBE"
       ) {
-<<<<<<< HEAD
         await this.log("You have already joined a tribe", "INFO");
       } else {
         await this.log(`Unable to join tribe: ${error.message}`, "FAILED");
-=======
-        await this.log("You have already joined a tribe", "warning");
-      } else {
-        await this.log(`Unable to join tribe: ${error.message}`, "error");
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
       }
       return false;
     }
   }
 
-<<<<<<< HEAD
   formatNextClaimTime(farming) {
     if (!farming) return "N/A";
     const endTime = DateTime.fromMillis(farming.endTime);
     return endTime.toFormat("dd/MM/yyyy HH:mm:ss");
   }
 
-=======
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
   async processAccount(queryId, shouldPerformTasks) {
     this.queryId = queryId;
 
     const token = await this.getNewToken();
     if (!token) {
-<<<<<<< HEAD
       await this.log("Unable to get token, skipping this account", "FAILED");
       return null;
-=======
-      await this.log("Unable to get token, skipping this account", "error");
-      return;
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
     }
 
     const userInfo = await this.getUserInfo();
     if (userInfo === null) {
-<<<<<<< HEAD
       await this.log(
         "Unable to get user info, skipping this account",
         "FAILED"
@@ -570,21 +415,9 @@ class GameBot {
     if (balanceInfo) {
       await this.log(
         `${balanceInfo.availableBalance}`,
-        "WAITING",
+        "SUCCESS",
         `|Next farming ${this.formatNextClaimTime(balanceInfo.farming)}`
       );
-=======
-      await this.log("Unable to get user info, skipping this account", "error");
-      return;
-    }
-
-    await this.log(`Processing account: ${userInfo.username}`);
-
-    const balanceInfo = await this.getBalance();
-    if (balanceInfo) {
-      await this.log(`Balance: ${balanceInfo.availableBalance}`);
-      await this.log(`Game passes: ${balanceInfo.playPasses}`);
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
 
       const tribeId = "b372af40-6e97-4782-b70d-4fc7ea435022";
       await this.joinTribe(tribeId);
@@ -592,35 +425,19 @@ class GameBot {
       if (!balanceInfo.farming) {
         const farmingResult = await this.startFarming();
         if (farmingResult) {
-<<<<<<< HEAD
           await this.log("Successfully started farming", "SUCCESS");
         }
       } else {
         const endTime = DateTime.fromMillis(balanceInfo.farming.endTime);
-=======
-          await this.log("Successfully started farming", "success");
-        }
-      } else {
-        const endTime = DateTime.fromMillis(balanceInfo.farming.endTime);
-        const formattedEndTime = endTime
-          .setZone("Asia/Jakarta")
-          .toFormat("dd/MM/yyyy HH:mm:ss");
-        await this.log(`Farm completion time: ${formattedEndTime}`);
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
         const currentTime = DateTime.now();
         if (currentTime > endTime) {
           const claimBalanceResult = await this.claimBalance();
           if (claimBalanceResult) {
-<<<<<<< HEAD
             await this.log("Successfully claimed farm", "SUCCESS");
-=======
-            await this.log("Successfully claimed farm", "success");
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
           }
 
           const farmingResult = await this.startFarming();
           if (farmingResult) {
-<<<<<<< HEAD
             await this.log("Successfully started farming", "SUCCESS");
           }
         } else {
@@ -630,17 +447,6 @@ class GameBot {
       }
     } else {
       await this.log("Unable to get balance info", "FAILED");
-=======
-            await this.log("Successfully started farming", "success");
-          }
-        } else {
-          const timeLeft = endTime.diff(currentTime).toFormat("hh:mm:ss");
-          await this.log(`Remaining farming time: ${timeLeft}`);
-        }
-      }
-    } else {
-      await this.log("Unable to get balance info", "error");
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
     }
 
     if (shouldPerformTasks) {
@@ -654,11 +460,6 @@ class GameBot {
           (section) => section.tasks || []
         );
 
-<<<<<<< HEAD
-=======
-        await this.log("Retrieved task list");
-
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
         const excludedTaskIds = [
           "5daf7250-76cc-4851-ac44-4c7fdcfe5994",
           "3b0ae076-9a85-4090-af55-d9f6c9463b2b",
@@ -675,7 +476,6 @@ class GameBot {
         allTasks = allTasks.filter(
           (task) => !excludedTaskIds.includes(task.id)
         );
-<<<<<<< HEAD
 
         for (const task of allTasks) {
           if (task.status === "NOT_STARTED") {
@@ -688,64 +488,23 @@ class GameBot {
                 await this.log(`Failed to claim task: ${task.title}`, "FAILED");
               }
             }
-=======
-        await this.log(`Total number of tasks: ${allTasks.length}`);
-
-        const notStartedTasks = allTasks.filter(
-          (task) => task.status === "NOT_STARTED"
-        );
-        await this.log(`Number of unstarted tasks: ${notStartedTasks.length}`);
-
-        for (const task of notStartedTasks) {
-          await this.log(`Starting task: ${task.title} | ${task.id}`);
-
-          const startResult = await this.startTask(task.id);
-          if (startResult) {
-            await this.log(`Started task: ${task.title}`, "success");
-          } else {
-            continue;
-          }
-
-          await this.Countdown(3);
-
-          const claimResult = await this.claimTask(task.id);
-          if (claimResult && claimResult.status === "FINISHED") {
-            await this.log(
-              `Completed task ${task.title} status: success`,
-              "success"
-            );
-          } else {
-            await this.log(
-              `Unable to claim reward for task: ${task.title}`,
-              "error"
-            );
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
           }
         }
       } else {
         await this.log(
           "Unable to get task list or task list is empty",
-<<<<<<< HEAD
           "FAILED"
-=======
-          "error"
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
         );
       }
     }
 
     const dailyRewardResult = await this.checkDailyReward();
     if (dailyRewardResult) {
-<<<<<<< HEAD
       await this.log("Claimed daily reward", "SUCCESS");
-=======
-      await this.log("Claimed daily reward", "success");
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
     }
 
     const friendBalanceInfo = await this.checkBalanceFriend();
     if (friendBalanceInfo) {
-<<<<<<< HEAD
       await this.log(
         `Friend balance: ${friendBalanceInfo.amountForClaim}`,
         "INFO"
@@ -760,27 +519,11 @@ class GameBot {
       }
     } else {
       await this.log("Unable to check friend balance", "FAILED");
-=======
-      await this.log(`Friend balance: ${friendBalanceInfo.amountForClaim}`);
-      if (friendBalanceInfo.amountForClaim > 0) {
-        const claimFriendBalanceResult = await this.claimBalanceFriend();
-        if (claimFriendBalanceResult) {
-          await this.log("Successfully claimed friend balance", "success");
-        }
-      } else {
-        await this.log("No friend balance to claim");
-      }
-    } else {
-      await this.log("Unable to check friend balance", "error");
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
     }
 
     if (balanceInfo && balanceInfo.playPasses > 0) {
       for (let j = 0; j < balanceInfo.playPasses; j++) {
-<<<<<<< HEAD
         await this.log(`Playing Game: ${j + 1}`, "INFO");
-=======
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
         let playAttempts = 0;
         const maxAttempts = 10;
 
@@ -788,10 +531,6 @@ class GameBot {
           try {
             const playResult = await this.playGame();
             if (playResult) {
-<<<<<<< HEAD
-=======
-              await this.log(`Starting game ${j + 1}...`, "success");
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
               await this.Countdown(30);
               const randomNumber =
                 Math.floor(Math.random() * (200 - 150 + 1)) + 150;
@@ -801,11 +540,7 @@ class GameBot {
                   `Successfully claimed game ${
                     j + 1
                   } reward with ${randomNumber} points`,
-<<<<<<< HEAD
                   "SUCCESS"
-=======
-                  "success"
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
                 );
               }
               break;
@@ -816,47 +551,26 @@ class GameBot {
               `Unable to play game ${j + 1}, attempt ${playAttempts}: ${
                 error.message
               }`,
-<<<<<<< HEAD
               "FAILED"
             );
             if (playAttempts < maxAttempts) {
               await this.log(`Retrying...`, "INFO");
-=======
-              "warning"
-            );
-            if (playAttempts < maxAttempts) {
-              await this.log(`Retrying...`);
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
               await this.Countdown(5);
             } else {
               await this.log(
                 `Failed after ${maxAttempts} attempts, skipping this game`,
-<<<<<<< HEAD
                 "FAILED"
-=======
-                "error"
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
               );
             }
           }
         }
       }
     } else {
-<<<<<<< HEAD
       await this.log("No game passes available", "INFO");
     }
 
     await this.log(`Finished processing account ${this.username}`, "SUCCESS");
     return balanceInfo?.farming?.endTime;
-=======
-      await this.log("No game passes available");
-    }
-
-    await this.log(
-      `Finished processing account ${userInfo.username}`,
-      "success"
-    );
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
   }
 
   static async askQuestion(query) {
@@ -923,13 +637,7 @@ if (isMainThread) {
     while (true) {
       console.log("Starting a new round of processing...");
       await processInBatches();
-<<<<<<< HEAD
       console.log("All accounts processed. Starting next round immediately.");
-=======
-
-      console.log("Waiting 10 minutes before starting new round...");
-      await new Promise((resolve) => setTimeout(resolve, 600000));
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
     }
   }
 
@@ -938,7 +646,6 @@ if (isMainThread) {
   // This code will run in worker threads
   (async () => {
     const bot = new GameBot(workerData.threadNumber);
-<<<<<<< HEAD
     const nextClaimTime = await bot.processAccount(
       workerData.queryId,
       workerData.shouldPerformTasks
@@ -958,9 +665,6 @@ if (isMainThread) {
       }
     }
 
-=======
-    await bot.processAccount(workerData.queryId, workerData.shouldPerformTasks);
->>>>>>> 8859862b8576ed66f8f8af027d2542fbebea1bdd
     parentPort.postMessage("done");
   })();
 }
