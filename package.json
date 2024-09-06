@@ -10,6 +10,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "async-mutex": "^0.5.0",
     "axios": "^1.7.5",
     "colors": "^1.4.0",
     "luxon": "^3.5.0"
