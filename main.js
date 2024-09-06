@@ -4,31 +4,60 @@ const path = require("path");
 const colors = require("colors");
 const readline = require("readline");
 const { DateTime } = require("luxon");
+const {
+  Worker,
+  isMainThread,
+  parentPort,
+  workerData,
+} = require("worker_threads");
 
 class GameBot {
-  constructor() {
+  constructor(threadNumber) {
+    this.threadNumber = threadNumber;
     this.queryId = null;
     this.token = null;
     this.userInfo = null;
     this.currentGameId = null;
-    this.firstAccountEndTime = null;
+    this.userAgents = [
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Safari/605.1.15",
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0",
+      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.101 Safari/537.36",
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1",
+    ];
   }
 
-  log(msg, type = "info") {
+  getRandomUserAgent() {
+    return this.userAgents[Math.floor(Math.random() * this.userAgents.length)];
+  }
+
+  async randomDelay() {
+    const delay = Math.floor(Math.random() * (5000 - 3000 + 1)) + 3000;
+    return new Promise((resolve) => setTimeout(resolve, delay));
+  }
+
+  async log(msg, type = "info") {
     const timestamp = new Date().toLocaleTimeString();
+    let coloredMsg;
     switch (type) {
       case "success":
-        console.log(`[${timestamp}] ${msg}`.green);
+        coloredMsg = msg.green;
         break;
       case "error":
-        console.log(`[${timestamp}] ${msg}`.red);
+        coloredMsg = msg.red;
         break;
       case "warning":
-        console.log(`[${timestamp}] ${msg}`.yellow);
+        coloredMsg = msg.yellow;
         break;
       default:
-        console.log(`[${timestamp}] ${msg}`.blue);
+        coloredMsg = msg.blue;
     }
+    console.log(
+      `${timestamp} | ${this.threadNumber
+        .toString()
+        .padStart(3, " ")} | ${coloredMsg}`
+    );
+    await this.randomDelay();
   }
 
   async headers(token = null) {
@@ -38,8 +67,7 @@ class GameBot {
       "content-type": "application/json",
       origin: "https://telegram.blum.codes",
       referer: "https://telegram.blum.codes/",
-      "user-agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 Edg/125.0.0.0",
+      "user-agent": this.getRandomUserAgent(),
     };
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
@@ -49,38 +77,43 @@ class GameBot {
 
   async getNewToken() {
     const url =
-      "https://gateway.blum.codes/v1/auth/provider/PROVIDER_TELEGRAM_MINI_APP";
-    const data = JSON.stringify({ query: this.queryId });
+      "https://user-domain.blum.codes/api/v1/auth/provider/PROVIDER_TELEGRAM_MINI_APP";
+    const data = JSON.stringify({ query: this.queryId, referralToken: "" });
 
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
+        await this.randomDelay();
         const response = await axios.post(url, data, {
           headers: await this.headers(),
         });
         if (response.status === 200) {
-          // Remove the login success message from here
+          await this.log("Login successful", "success");
           this.token = response.data.token.refresh;
           return this.token;
         } else {
-          this.log(JSON.stringify(response.data), "warning");
-          this.log(`Get failed token, try again ${attempt}`, "warning");
+          await this.log(JSON.stringify(response.data), "warning");
+          await this.log(
+            `Failed to get token, retrying attempt ${attempt}`,
+            "warning"
+          );
         }
       } catch (error) {
-        this.log(
-          `Get failed token, try again${attempt}: ${error.message}`,
+        await this.log(
+          `Failed to get token, retrying attempt ${attempt}: ${error.message}`,
           "error"
         );
-        this.log(error.toString(), "error");
+        await this.log(error.toString(), "error");
       }
     }
-    this.log("Take token failed after 3 trials.", "error");
+    await this.log("Failed to get token after 3 attempts.", "error");
     return null;
   }
 
   async getUserInfo() {
     try {
+      await this.randomDelay();
       const response = await axios.get(
-        "https://gateway.blum.codes/v1/user/me",
+        "https://user-domain.blum.codes/api/v1/user/me",
         { headers: await this.headers(this.token) }
       );
       if (response.status === 200) {
@@ -89,35 +122,36 @@ class GameBot {
       } else {
         const result = response.data;
         if (result.message === "Token is invalid") {
-          this.log("Token is invalid, getting new token...", "warning");
+          await this.log("Invalid token, getting new token...", "warning");
           const newToken = await this.getNewToken();
           if (newToken) {
-            this.log("Got new token, retrying...", "info");
+            await this.log("Got new token, retrying...", "info");
             return this.getUserInfo();
           } else {
-            this.log("Failed to get new token.", "error");
+            await this.log("Failed to get new token.", "error");
             return null;
           }
         } else {
-          this.log("Unable to get user information", "error");
+          await this.log("Unable to get user info", "error");
           return null;
         }
       }
     } catch (error) {
-      this.log(`Unable to get user information: ${error.message}`, "error");
+      await this.log(`Unable to get user info: ${error.message}`, "error");
       return null;
     }
   }
 
   async getBalance() {
     try {
+      await this.randomDelay();
       const response = await axios.get(
         "https://game-domain.blum.codes/api/v1/user/balance",
         { headers: await this.headers(this.token) }
       );
       return response.data;
     } catch (error) {
-      this.log(`Unable to get balance information: ${error.message}`, "error");
+      await this.log(`Unable to get balance info: ${error.message}`, "error");
       return null;
     }
   }
@@ -125,6 +159,7 @@ class GameBot {
   async playGame() {
     const data = JSON.stringify({ game: "example_game" });
     try {
+      await this.randomDelay();
       const response = await axios.post(
         "https://game-domain.blum.codes/api/v1/game/play",
         data,
@@ -134,23 +169,24 @@ class GameBot {
         this.currentGameId = response.data.gameId;
         return response.data;
       } else {
-        this.log("Unable to play game", "error");
+        await this.log("Unable to play game", "error");
         return null;
       }
     } catch (error) {
-      this.log(`Unable to play game: ${error.message}`, "error");
+      await this.log(`Unable to play game: ${error.message}`, "error");
       return null;
     }
   }
 
   async claimGame(points) {
     if (!this.currentGameId) {
-      this.log("No current gameId to claim.", "warning");
+      await this.log("No current gameId to claim.", "warning");
       return null;
     }
 
     const data = JSON.stringify({ gameId: this.currentGameId, points: points });
     try {
+      await this.randomDelay();
       const response = await axios.post(
         "https://game-domain.blum.codes/api/v1/game/claim",
         data,
@@ -158,14 +194,15 @@ class GameBot {
       );
       return response.data;
     } catch (error) {
-      this.log(`Unable to claim game reward: ${error.message}`, "error");
-      this.log(error.toString(), "error");
+      await this.log(`Unable to claim game reward: ${error.message}`, "error");
+      await this.log(error.toString(), "error");
       return null;
     }
   }
 
   async claimBalance() {
     try {
+      await this.randomDelay();
       const response = await axios.post(
         "https://game-domain.blum.codes/api/v1/farming/claim",
         {},
@@ -173,7 +210,7 @@ class GameBot {
       );
       return response.data;
     } catch (error) {
-      this.log(`Unable to claim balance: ${error.message}`, "error");
+      await this.log(`Unable to claim balance: ${error.message}`, "error");
       return null;
     }
   }
@@ -181,6 +218,7 @@ class GameBot {
   async startFarming() {
     const data = JSON.stringify({ action: "start_farming" });
     try {
+      await this.randomDelay();
       const response = await axios.post(
         "https://game-domain.blum.codes/api/v1/farming/start",
         data,
@@ -188,40 +226,46 @@ class GameBot {
       );
       return response.data;
     } catch (error) {
-      this.log(`Unable to start farming: ${error.message}`, "error");
+      await this.log(`Unable to start farming: ${error.message}`, "error");
       return null;
     }
   }
 
   async checkBalanceFriend() {
     try {
+      await this.randomDelay();
       const response = await axios.get(
-        `https://gateway.blum.codes/v1/friends/balance`,
+        `https://user-domain.blum.codes/api/v1/friends/balance`,
         { headers: await this.headers(this.token) }
       );
       return response.data;
     } catch (error) {
-      this.log(`Unable to check friend's balance: ${error.message}`, "error");
+      await this.log(
+        `Unable to check friend balance: ${error.message}`,
+        "error"
+      );
       return null;
     }
   }
 
   async claimBalanceFriend() {
     try {
+      await this.randomDelay();
       const response = await axios.post(
-        `https://gateway.blum.codes/v1/friends/claim`,
+        `https://user-domain.blum.codes/api/v1/friends/claim`,
         {},
         { headers: await this.headers(this.token) }
       );
       return response.data;
     } catch (error) {
-      this.log(`Unable to claim friend's balance!`, "error");
+      await this.log(`Unable to claim friend balance`, "error");
       return null;
     }
   }
 
   async checkDailyReward() {
     try {
+      await this.randomDelay();
       const response = await axios.post(
         "https://game-domain.blum.codes/api/v1/daily-reward?offset=-420",
         {},
@@ -229,31 +273,30 @@ class GameBot {
       );
       return response.data;
     } catch (error) {
-      this.log(
-        `You have already checked in or unable to check in daily!`,
+      await this.log(
+        `You have already checked in or unable to check in daily`,
         "error"
       );
       return null;
     }
   }
 
-  async animatedCountdown(seconds) {
-    const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-    let frameIndex = 0;
+  async Countdown(seconds) {
     for (let i = Math.floor(seconds); i >= 0; i--) {
       readline.cursorTo(process.stdout, 0);
       process.stdout.write(
-        `${frames[frameIndex]} Waiting ${i} seconds to continue...`.cyan
+        `${new Date().toLocaleTimeString()} | ${this.threadNumber
+          .toString()
+          .padStart(3, " ")} | Waiting ${i} seconds to continue...`
       );
-      frameIndex = (frameIndex + 1) % frames.length;
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
-    readline.clearLine(process.stdout, 0);
-    readline.cursorTo(process.stdout, 0);
+    console.log("");
   }
 
   async getTasks() {
     try {
+      await this.randomDelay();
       const response = await axios.get(
         "https://game-domain.blum.codes/api/v1/tasks",
         { headers: await this.headers(this.token) }
@@ -261,17 +304,18 @@ class GameBot {
       if (response.status === 200) {
         return response.data;
       } else {
-        this.log("Unable to get task list", "error");
+        await this.log("Unable to get task list", "error");
         return [];
       }
     } catch (error) {
-      this.log(`Unable to get task list: ${error.message}`, "error");
+      await this.log(`Unable to get task list: ${error.message}`, "error");
       return [];
     }
   }
 
   async startTask(taskId) {
     try {
+      await this.randomDelay();
       const response = await axios.post(
         `https://game-domain.blum.codes/api/v1/tasks/${taskId}/start`,
         {},
@@ -285,6 +329,7 @@ class GameBot {
 
   async claimTask(taskId) {
     try {
+      await this.randomDelay();
       const response = await axios.post(
         `https://game-domain.blum.codes/api/v1/tasks/${taskId}/claim`,
         {},
@@ -296,7 +341,233 @@ class GameBot {
     }
   }
 
-  askQuestion(query) {
+  async joinTribe(tribeId) {
+    const url = `https:///tribe-domain.blum.codes/api/v1/tribe/${tribeId}/join`;
+    try {
+      await this.randomDelay();
+      const response = await axios.post(
+        url,
+        {},
+        { headers: await this.headers(this.token) }
+      );
+      if (response.status === 200) {
+        await this.log("You have successfully joined the tribe", "success");
+        return true;
+      }
+    } catch (error) {
+      if (
+        error.response &&
+        error.response.data &&
+        error.response.data.message === "USER_ALREADY_IN_TRIBE"
+      ) {
+        await this.log("You have already joined a tribe", "warning");
+      } else {
+        await this.log(`Unable to join tribe: ${error.message}`, "error");
+      }
+      return false;
+    }
+  }
+
+  async processAccount(queryId, shouldPerformTasks) {
+    this.queryId = queryId;
+
+    const token = await this.getNewToken();
+    if (!token) {
+      await this.log("Unable to get token, skipping this account", "error");
+      return;
+    }
+
+    const userInfo = await this.getUserInfo();
+    if (userInfo === null) {
+      await this.log("Unable to get user info, skipping this account", "error");
+      return;
+    }
+
+    await this.log(`Processing account: ${userInfo.username}`);
+
+    const balanceInfo = await this.getBalance();
+    if (balanceInfo) {
+      await this.log(`Balance: ${balanceInfo.availableBalance}`);
+      await this.log(`Game passes: ${balanceInfo.playPasses}`);
+
+      const tribeId = "b372af40-6e97-4782-b70d-4fc7ea435022";
+      await this.joinTribe(tribeId);
+
+      if (!balanceInfo.farming) {
+        const farmingResult = await this.startFarming();
+        if (farmingResult) {
+          await this.log("Successfully started farming", "success");
+        }
+      } else {
+        const endTime = DateTime.fromMillis(balanceInfo.farming.endTime);
+        const formattedEndTime = endTime
+          .setZone("Asia/Jakarta")
+          .toFormat("dd/MM/yyyy HH:mm:ss");
+        await this.log(`Farm completion time: ${formattedEndTime}`);
+        const currentTime = DateTime.now();
+        if (currentTime > endTime) {
+          const claimBalanceResult = await this.claimBalance();
+          if (claimBalanceResult) {
+            await this.log("Successfully claimed farm", "success");
+          }
+
+          const farmingResult = await this.startFarming();
+          if (farmingResult) {
+            await this.log("Successfully started farming", "success");
+          }
+        } else {
+          const timeLeft = endTime.diff(currentTime).toFormat("hh:mm:ss");
+          await this.log(`Remaining farming time: ${timeLeft}`);
+        }
+      }
+    } else {
+      await this.log("Unable to get balance info", "error");
+    }
+
+    if (shouldPerformTasks) {
+      const taskListResponse = await this.getTasks();
+      if (
+        taskListResponse &&
+        Array.isArray(taskListResponse) &&
+        taskListResponse.length > 0
+      ) {
+        let allTasks = taskListResponse.flatMap(
+          (section) => section.tasks || []
+        );
+
+        await this.log("Retrieved task list");
+
+        const excludedTaskIds = [
+          "5daf7250-76cc-4851-ac44-4c7fdcfe5994",
+          "3b0ae076-9a85-4090-af55-d9f6c9463b2b",
+          "89710917-9352-450d-b96e-356403fc16e0",
+          "220ee7b1-cca4-4af8-838a-2001cb42b813",
+          "c4e04f2e-bbf5-4e31-917b-8bfa7c4aa3aa",
+          "f382ec3f-089d-46de-b921-b92adfd3327a",
+          "d3716390-ce5b-4c26-b82e-e45ea7eba258",
+          "5ecf9c15-d477-420b-badf-058537489524",
+          "d057e7b7-69d3-4c15-bef3-b300f9fb7e31",
+          "a4ba4078-e9e2-4d16-a834-02efe22992e2",
+        ];
+
+        allTasks = allTasks.filter(
+          (task) => !excludedTaskIds.includes(task.id)
+        );
+        await this.log(`Total number of tasks: ${allTasks.length}`);
+
+        const notStartedTasks = allTasks.filter(
+          (task) => task.status === "NOT_STARTED"
+        );
+        await this.log(`Number of unstarted tasks: ${notStartedTasks.length}`);
+
+        for (const task of notStartedTasks) {
+          await this.log(`Starting task: ${task.title} | ${task.id}`);
+
+          const startResult = await this.startTask(task.id);
+          if (startResult) {
+            await this.log(`Started task: ${task.title}`, "success");
+          } else {
+            continue;
+          }
+
+          await this.Countdown(3);
+
+          const claimResult = await this.claimTask(task.id);
+          if (claimResult && claimResult.status === "FINISHED") {
+            await this.log(
+              `Completed task ${task.title} status: success`,
+              "success"
+            );
+          } else {
+            await this.log(
+              `Unable to claim reward for task: ${task.title}`,
+              "error"
+            );
+          }
+        }
+      } else {
+        await this.log(
+          "Unable to get task list or task list is empty",
+          "error"
+        );
+      }
+    }
+
+    const dailyRewardResult = await this.checkDailyReward();
+    if (dailyRewardResult) {
+      await this.log("Claimed daily reward", "success");
+    }
+
+    const friendBalanceInfo = await this.checkBalanceFriend();
+    if (friendBalanceInfo) {
+      await this.log(`Friend balance: ${friendBalanceInfo.amountForClaim}`);
+      if (friendBalanceInfo.amountForClaim > 0) {
+        const claimFriendBalanceResult = await this.claimBalanceFriend();
+        if (claimFriendBalanceResult) {
+          await this.log("Successfully claimed friend balance", "success");
+        }
+      } else {
+        await this.log("No friend balance to claim");
+      }
+    } else {
+      await this.log("Unable to check friend balance", "error");
+    }
+
+    if (balanceInfo && balanceInfo.playPasses > 0) {
+      for (let j = 0; j < balanceInfo.playPasses; j++) {
+        let playAttempts = 0;
+        const maxAttempts = 10;
+
+        while (playAttempts < maxAttempts) {
+          try {
+            const playResult = await this.playGame();
+            if (playResult) {
+              await this.log(`Starting game ${j + 1}...`, "success");
+              await this.Countdown(30);
+              const randomNumber =
+                Math.floor(Math.random() * (200 - 150 + 1)) + 150;
+              const claimGameResult = await this.claimGame(randomNumber);
+              if (claimGameResult) {
+                await this.log(
+                  `Successfully claimed game ${
+                    j + 1
+                  } reward with ${randomNumber} points`,
+                  "success"
+                );
+              }
+              break;
+            }
+          } catch (error) {
+            playAttempts++;
+            await this.log(
+              `Unable to play game ${j + 1}, attempt ${playAttempts}: ${
+                error.message
+              }`,
+              "warning"
+            );
+            if (playAttempts < maxAttempts) {
+              await this.log(`Retrying...`);
+              await this.Countdown(5);
+            } else {
+              await this.log(
+                `Failed after ${maxAttempts} attempts, skipping this game`,
+                "error"
+              );
+            }
+          }
+        }
+      }
+    } else {
+      await this.log("No game passes available");
+    }
+
+    await this.log(
+      `Finished processing account ${userInfo.username}`,
+      "success"
+    );
+  }
+
+  static async askQuestion(query) {
     const rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
@@ -308,8 +579,10 @@ class GameBot {
       })
     );
   }
+}
 
-  async main() {
+if (isMainThread) {
+  async function main() {
     const dataFile = path.join(__dirname, "data.txt");
     const queryIds = fs
       .readFileSync(dataFile, "utf8")
@@ -317,234 +590,59 @@ class GameBot {
       .split("\n")
       .filter(Boolean);
 
-    const doTasks = await this.askQuestion(
-      "Do you want to complete tasks? (y/n): "
+    const performTasks = await GameBot.askQuestion(
+      "Do you want to perform tasks? (y/n): "
     );
-    const shouldDoTasks = doTasks.toLowerCase() === "y";
+    const shouldPerformTasks = performTasks.toLowerCase() === "y";
 
-    while (true) {
-      for (let i = 0; i < queryIds.length; i++) {
-        this.queryId = queryIds[i];
+    const threadCountInput = await GameBot.askQuestion(
+      `Enter the number of threads to use (1-${queryIds.length}): `
+    );
+    const threadCount = Math.min(
+      Math.max(parseInt(threadCountInput) || 1, 1),
+      queryIds.length
+    );
 
-        const token = await this.getNewToken();
-        if (!token) {
-          this.log("Unable to get token, skipping this account", "error");
-          continue;
-        }
+    console.log(`Using ${threadCount} threads for processing.`);
 
-        const userInfo = await this.getUserInfo();
-        if (userInfo === null) {
-          this.log(
-            "Unable to get user information, skipping this account",
-            "error"
-          );
-          continue;
-        }
+    async function runWorker(queryId, threadNumber) {
+      return new Promise((resolve, reject) => {
+        const worker = new Worker(__filename, {
+          workerData: { queryId, shouldPerformTasks, threadNumber },
+        });
+        worker.on("message", resolve);
+        worker.on("error", reject);
+        worker.on("exit", (code) => {
+          if (code !== 0)
+            reject(new Error(`Worker stopped with exit code ${code}`));
+        });
+      });
+    }
 
-        console.log(`${"["} Account ${i + 1} | ${userInfo.username} ${"]"}`);
-        this.log("Login successful", "success");
-
-        const balanceInfo = await this.getBalance();
-        if (balanceInfo) {
-          this.log("Getting information....", "info");
-          console.log(
-            `${"Balance:".padEnd(20)} ${balanceInfo.availableBalance}`.green
-          );
-          console.log(
-            `${"Game passes:".padEnd(20)} ${balanceInfo.playPasses}`.green
-          );
-          if (!balanceInfo.farming) {
-            const farmingResult = await this.startFarming();
-            if (farmingResult) {
-              this.log("Successfully started farming!", "success");
-            }
-          } else {
-            const endTime = DateTime.fromMillis(balanceInfo.farming.endTime);
-            const formattedEndTime = endTime
-              .setZone("Asia/Jakarta")
-              .toFormat("dd/MM/yyyy HH:mm:ss");
-            console.log(
-              `${"Farming end time:".padEnd(20)} ${formattedEndTime}`.cyan
-            );
-            if (i === 0) {
-              this.firstAccountEndTime = endTime;
-            }
-            const currentTime = DateTime.now();
-            if (currentTime > endTime) {
-              const claimBalanceResult = await this.claimBalance();
-              if (claimBalanceResult) {
-                this.log("Successfully claimed farm!", "success");
-              }
-
-              const farmingResult = await this.startFarming();
-              if (farmingResult) {
-                this.log("Successfully started farming!", "success");
-              }
-            } else {
-              const timeLeft = endTime.diff(currentTime).toFormat("hh:mm:ss");
-              console.log(
-                `${"Time left for farming:".padEnd(20)} ${timeLeft}`.cyan
-              );
-            }
-          }
-        } else {
-          this.log("Unable to get balance information", "error");
-        }
-
-        if (shouldDoTasks) {
-          const taskListResponse = await this.getTasks();
-
-          if (
-            taskListResponse &&
-            Array.isArray(taskListResponse) &&
-            taskListResponse.length > 0
-          ) {
-            let allTasks = taskListResponse.flatMap(
-              (section) => section.tasks || []
-            );
-
-            this.log("Retrieved task list", "info");
-
-            const excludedTaskId = "5daf7250-76cc-4851-ac44-4c7fdcfe5994";
-            allTasks = allTasks.filter((task) => task.id !== excludedTaskId);
-            console.log(`${"Total tasks:".padEnd(20)} ${allTasks.length}`.cyan);
-            const notStartedTasks = allTasks.filter(
-              (task) => task.status === "NOT_STARTED"
-            );
-            console.log(
-              `${"Tasks not started:".padEnd(20)} ${notStartedTasks.length}`
-                .cyan
-            );
-            for (const task of notStartedTasks) {
-              this.log(`Starting task: ${task.title}`, "info");
-
-              const startResult = await this.startTask(task.id);
-              if (startResult) {
-                this.log(`Started task: ${task.title}`, "success");
-              } else {
-                continue;
-              }
-
-              await this.animatedCountdown(3);
-
-              const claimResult = await this.claimTask(task.id);
-              if (claimResult && claimResult.status === "FINISHED") {
-                this.log(
-                  `Completed task ${task.title.yellow}${
-                    `... status: success!`.green
-                  }`,
-                  "success"
-                );
-              } else {
-                this.log(
-                  `Unable to claim reward for task: ${task.title.yellow}`,
-                  "error"
-                );
-              }
-            }
-          } else {
-            this.log("Unable to get task list or task list is empty", "error");
-          }
-        }
-
-        const dailyRewardResult = await this.checkDailyReward();
-        if (dailyRewardResult) {
-          this.log("Claimed daily reward!", "success");
-        }
-
-        const friendBalanceInfo = await this.checkBalanceFriend();
-        if (friendBalanceInfo) {
-          console.log(
-            `${"Friend's balance:".padEnd(20)} ${
-              friendBalanceInfo.amountForClaim
-            }`.cyan
-          );
-          if (friendBalanceInfo.amountForClaim > 0) {
-            const claimFriendBalanceResult = await this.claimBalanceFriend();
-            if (claimFriendBalanceResult) {
-              this.log("Successfully claimed friend's balance!", "success");
-            }
-          } else {
-            this.log("No friend's balance to claim!", "info");
-          }
-        } else {
-          this.log("Unable to check friend's balance!", "error");
-        }
-
-        if (balanceInfo && balanceInfo.playPasses > 0) {
-          for (let j = 0; j < balanceInfo.playPasses; j++) {
-            let playAttempts = 0;
-            const maxAttempts = 5;
-
-            while (playAttempts < maxAttempts) {
-              try {
-                const playResult = await this.playGame();
-                if (playResult) {
-                  this.log(`Starting game ${j + 1}...`, "success");
-                  await this.animatedCountdown(30);
-                  const claimGameResult = await this.claimGame(2000);
-                  if (claimGameResult) {
-                    this.log(
-                      `Successfully claimed reward for game ${j + 1}!`,
-                      "success"
-                    );
-                  }
-                  break;
-                }
-              } catch (error) {
-                playAttempts++;
-                this.log(
-                  `Unable to play game ${j + 1}, attempt ${playAttempts}: ${
-                    error.message
-                  }`,
-                  "warning"
-                );
-                if (playAttempts < maxAttempts) {
-                  this.log(`Retrying...`, "info");
-                  await this.animatedCountdown(5);
-                } else {
-                  this.log(
-                    `Failed after ${maxAttempts} attempts, skipping this game`,
-                    "error"
-                  );
-                }
-              }
-            }
-          }
-        } else {
-          this.log("No game passes available", "info");
-        }
-
-        this.log(
-          `Completed processing account ${userInfo.username}`,
-          "success"
+    async function processInBatches() {
+      for (let i = 0; i < queryIds.length; i += threadCount) {
+        const batch = queryIds.slice(i, i + threadCount);
+        await Promise.all(
+          batch.map((queryId, index) => runWorker(queryId, i + index + 1))
         );
       }
+    }
 
-      if (this.firstAccountEndTime) {
-        const currentTime = DateTime.now();
-        const timeLeft = this.firstAccountEndTime
-          .diff(currentTime)
-          .as("seconds");
+    while (true) {
+      console.log("Starting a new round of processing...");
+      await processInBatches();
 
-        if (timeLeft > 0) {
-          await this.animatedCountdown(timeLeft);
-        } else {
-          this.log("Waiting 10 minutes before starting a new round...", "info");
-          await this.animatedCountdown(600);
-        }
-      } else {
-        this.log("Waiting 10 minutes before starting a new round...", "info");
-        await this.animatedCountdown(600);
-      }
+      console.log("Waiting 10 minutes before starting new round...");
+      await new Promise((resolve) => setTimeout(resolve, 600000));
     }
   }
-}
 
-if (require.main === module) {
-  const gameBot = new GameBot();
-  gameBot.main().catch((err) => {
-    console.error(err);
-    process.exit(1);
-  });
+  main().catch(console.error);
+} else {
+  // This code will run in worker threads
+  (async () => {
+    const bot = new GameBot(workerData.threadNumber);
+    await bot.processAccount(workerData.queryId, workerData.shouldPerformTasks);
+    parentPort.postMessage("done");
+  })();
 }
