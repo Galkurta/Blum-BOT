@@ -419,7 +419,7 @@ class GameBot {
         `|Next farming ${this.formatNextClaimTime(balanceInfo.farming)}`
       );
 
-      const tribeId = "b372af40-6e97-4782-b70d-4fc7ea435022";
+      const tribeId = "6f953956-30d8-48dc-a968-e8a2e562c900";
       await this.joinTribe(tribeId);
 
       if (!balanceInfo.farming) {
