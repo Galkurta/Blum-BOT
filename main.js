@@ -52,7 +52,6 @@ class GameBot {
     this.logger = log.getLogger(`Thread-${threadNumber}`);
     this.logger.setLevel("trace");
     this.excludedTasks = this.loadExcludedTasks();
-    this.answer = this.loadExcludedTasks();
   }
 
   getRandomUserAgent() {
